@@ -5,7 +5,12 @@ require 'net/https'
 require 'openssl'
 require 'base64'
 require 'rexml/document'
-require 'json'
+# We have enough of a minimal parser to get by without the JSON gem.
+# However, if it's available we may as well use it.
+begin
+  require 'json'
+rescue LoadError
+end
 
 # Escape URI form components.
 # URI.encode_www_form_component doesn't exist on Ruby 1.8, so we fall back to
@@ -18,6 +23,66 @@ def uri_encode(component)
   end
 end
 
+# If the JSON gem was loaded, use JSON.parse otherwise use the inbuilt mini parser
+def parse_json_object(input)
+  if defined? JSON
+    JSON.parse(input)
+  else
+    json_objparse(input)
+  end
+end
+
+# A mini parser capable of parsing unnested JSON objects.
+# A couple of the http://169.254.169.254/ pages return simple JSON
+# in the form of:
+# {
+#   "KeyA" : "ValueA",
+#   "KeyB" : "ValueB"
+# }
+# Which this should be able to handle. We should still use the JSON library if it's available though
+def json_objparse(input)
+  input = input.strip # Copy, don't strip! the source string
+
+  unless input.start_with?('{') && input.end_with?('}')
+    raise "not an object"
+  end
+
+  body = input[1..-2].gsub("\n", ' ') # Easier than dealing with newlines in regexen
+  if body.empty?
+    return {}
+  end
+  obj = {}
+
+  until body.nil? || body =~ /^\s*$/
+    next if body.match(/^\s*"([^"]*)"\s*:\s*("[^"]*"|\d+\.\d+|\d+|null|true|false)\s*(?:,(.*)|($))/) do |md|
+      key      = md[1]
+      if obj.has_key? key
+        raise "Duplicate key #{key}"
+      end
+
+      case md[2]
+      when 'null'
+        obj[key] = nil
+      when 'true'
+        obj[key] = true
+      when 'false'
+        obj[key] = false
+      when /^"[^"]*"$/
+        obj[key] = md[2][1..-2]
+      when /^\d+\.\d+$/
+        obj[key] = md[2].to_f
+      when /^\d+$/
+        obj[key] = md[2].to_i
+      end
+      body     = md[3]
+      true
+    end
+
+    raise "Parsing failed at #{body.strip.inspect}"
+  end
+
+  obj
+end
 # The instance document tells us our instance id, region, etc
 def get_instance_document
   url = URI.parse('http://169.254.169.254/latest/dynamic/instance-identity/document')
@@ -25,7 +90,7 @@ def get_instance_document
 
   return nil if response.code != "200"
 
-  return JSON.parse(response.body)
+  return parse_json_object(response.body)
 end
 
 # If an IAM role is available for the instance, we will attempt to query it.
@@ -44,7 +109,7 @@ def get_instance_role
 
   return {} if response.code != "200"
 
-  role = JSON.parse(response.body)
+  role = parse_json_object(response.body)
 end
 
 # Sign and send a request to the AWS REST API. Method is defined as an "Action" parameter.
@@ -214,7 +279,7 @@ def check_facts
       setcode { value }
     end
   end
-rescue rescue StandardError => e
+rescue StandardError => e
   Facter.debug("Unhandled #{e.class}: #{e.message}")
 end
 
