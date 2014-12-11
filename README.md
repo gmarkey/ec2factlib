@@ -5,7 +5,8 @@ A puppet/facter plugin to expose EC2 instance details as facts.
 The plugin is written in (almost\*) vanilla/stdlib ruby to make it suitable for
 initial bootstrap without the aws-sdk gem installed.
 
-\* Currently depends on the `json` gem.
+\* Has a soft dependency on the json gem. At the time of writing, it can get by
+with a builtin mini parser but JSON.parse will be used if available.
 
 Facts currently include:
 * EC2 version string from `/etc/ec2_version` (`ec2_version`)
