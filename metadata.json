@@ -2,6 +2,7 @@
   "name": "fairfax-ec2factlib",
   "version": "0.1.0",
   "author": "Fairfax Online Hosting",
+  "dependencies": [],
   "license": "APL 2",
   "project_page": "https://github.com/fairfaxmedia/ec2factlib",
   "source": "https://github.com/fairfaxmedia/ec2factlib",
