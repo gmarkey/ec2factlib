@@ -12,6 +12,7 @@ Facts currently include:
 * EC2 version string from `/etc/ec2_version` (`ec2_version`)
 * EC2 instance tags (`ec2_tag_*`)
 * CloudFormation stack name (`cloudformation_stack_name`)
+* CloudFormation stack parameters (`cfn_stack_param_*`)
 * Autoscaling group name (`autoscaling_group_name`)
 * Autoscaling group min/max/desired size (`autoscaling_(min|max)_size`, `autoscaling_desired_capacity`)
 
