@@ -154,6 +154,34 @@ def query(parameters, endpoint, access_key, secret_key, token = nil)
   response
 end
 
+# Queries CFN endpoint for stack info
+def query_cfn(stack_name, endpoint, access_key, secret_key, token = nil)
+  parameters = [
+    ['Action',            'DescribeStacks' ],
+    ['StackName',         stack_name       ],
+    ['Version',           '2010-05-15'     ],
+  ]
+  response = query(parameters, endpoint, access_key, secret_key, token)
+
+  if response.code != "200"
+    Facter.debug("DescribeStacks returned #{response.code} #{response.message}")
+    return {}
+  end
+
+  doc = REXML::Document.new(response.body)
+
+  cfn = {}
+
+  # Stack Parameters
+  doc.get_elements('//Parameters/member').each do |item|
+    key = item.get_elements('ParameterKey')[0].text
+    value = item.get_elements('ParameterValue')[0].text
+    cfn['cfn_stack_param_' + key] = value
+  end
+
+  return cfn
+end
+
 # Queries the tags from the provided EC2 instance id.
 def query_instance_tags(instance_id, endpoint, access_key, secret_key, token = nil)
   parameters = [
@@ -184,7 +212,7 @@ end
 def query_autoscale_group(group_id, endpoint, access_key, secret_key, token)
   parameters = [
     ['Action',                            'DescribeAutoScalingGroups' ],
-    ['AutoScalingGroupNames.member.1',      group_id                    ],
+    ['AutoScalingGroupNames.member.1',    group_id                    ],
     ['Version',                           '2011-01-01'                ],
   ]
   response = query(parameters, endpoint, access_key, secret_key, token)
@@ -271,7 +299,12 @@ def check_facts
   end
 
   if tags.has_key? 'aws:cloudformation:stack-name'
-    facts['cloudformation_stack_name'] = tags['aws:cloudformation:stack-name']
+    cfn_stack_name = tags['aws:cloudformation:stack-name']
+    facts['cloudformation_stack_name'] = cfn_stack_name
+
+    # Grab CFN parameters
+    cfn_data = query_cfn(cfn_stack_name, "cloudformation.#{region}.amazonaws.com", access_key, secret_key, token)
+    facts = facts.merge(cfn_data)
   end
 
   facts.each do |fact, value|
