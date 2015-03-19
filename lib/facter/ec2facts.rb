@@ -144,14 +144,22 @@ def query(parameters, endpoint, access_key, secret_key, token = nil)
   signature = uri_encode(signature)
 
   req_path = "/?#{params_string}&Signature=#{signature}"
-  req = Net::HTTP::Get.new(req_path)
 
-  http = Net::HTTP.new(endpoint, 443)
-  http.use_ssl = true
+  retries = 5
+  begin
+    req = Net::HTTP::Get.new(req_path)
 
-  response = http.start { http.request(req) }
+    http = Net::HTTP.new(endpoint, 443)
+    http.use_ssl = true
 
-  response
+    response = http.start { http.request(req) }
+
+    response
+  rescue StandardError, Timeout::Error => e
+    Facter.debug("Error querying 'http://#{endpoint}/?#{sorted_params_string}' - retries left: #{retries}")
+    sleep 3
+    retry if (retries -= 1) > 0
+  end
 end
 
 # Queries CFN endpoint for stack info
