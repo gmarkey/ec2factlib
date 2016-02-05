@@ -267,9 +267,6 @@ end
 # the autoscaling group min/max/desired size parameters.
 def check_facts
   facts = {}
-  open('/etc/ec2_version', 'r') do |io|
-    facts['ec2_version'] = io.read.strip
-  end
 
   instance    = get_instance_document
   if instance.nil?
@@ -324,9 +321,9 @@ rescue StandardError => e
   Facter.debug("Unhandled #{e.class}: #{e.message}")
 end
 
-# This file seems to exist on our EC2 instances. There may be a better way to
-# determine if we are running on EC2.
-# We mostly want to avoid waiting for http://169.254.169.254/ to time out if we are not on EC2.
-if File.exists?('/etc/ec2_version')
+# Determine if we are running on EC2.
+ec2 = Facter.value(:serialnumber)[0,3] == "ec2"
+
+if ec2
   check_facts
 end
